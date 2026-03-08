@@ -1,0 +1,37 @@
+name: kigali_city_app
+description: "Kigali City directory app — discover businesses and places in Kigali."
+publish_to: 'none'
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Firebase
+  firebase_core: ^3.6.0
+  firebase_auth: ^5.3.0
+  cloud_firestore: ^5.4.0
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Maps
+  google_maps_flutter: ^2.9.0
+
+  # URL launching (phone, web, maps)
+  url_launcher: ^6.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
