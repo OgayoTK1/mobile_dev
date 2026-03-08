@@ -27,6 +27,9 @@ dependencies:
   # URL launching (phone, web, maps)
   url_launcher: ^6.3.0
 
+  # Runtime permissions
+  permission_handler: ^11.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

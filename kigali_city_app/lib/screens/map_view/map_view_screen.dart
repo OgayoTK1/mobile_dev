@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../../models/listing.dart';
 import '../../providers/app_providers.dart';
 import '../detail/listing_detail_screen.dart';
@@ -16,6 +17,20 @@ class _MapViewScreenState extends ConsumerState<MapViewScreen> {
   // ignore: unused_field
   GoogleMapController? _mapController;
   static const _kigaliCenter = LatLng(-1.9441, 30.0619);
+  bool _locationPermissionGranted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _requestLocationPermission();
+  }
+
+  Future<void> _requestLocationPermission() async {
+    final status = await Permission.locationWhenInUse.request();
+    if (mounted) {
+      setState(() => _locationPermissionGranted = status.isGranted);
+    }
+  }
 
   Set<Marker> _buildMarkers(List<Listing> listings) {
     return listings
@@ -54,8 +69,8 @@ class _MapViewScreenState extends ConsumerState<MapViewScreen> {
           ),
           markers: _buildMarkers(listings),
           onMapCreated: (controller) => _mapController = controller,
-          myLocationButtonEnabled: true,
-          myLocationEnabled: true,
+          myLocationButtonEnabled: _locationPermissionGranted,
+          myLocationEnabled: _locationPermissionGranted,
         ),
       ),
     );
