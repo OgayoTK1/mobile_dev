@@ -28,7 +28,25 @@ class AuthService {
   }
 
   Future<void> sendEmailVerification() async {
-    await _auth.currentUser?.sendEmailVerification();
+    try {
+      final user = _auth.currentUser;
+      if (user == null) {
+        print('❌ No current user - cannot send verification email');
+        return;
+      }
+
+      if (user.emailVerified) {
+        print('✓ Email already verified');
+        return;
+      }
+
+      print('📧 Attempting to send verification email to: ${user.email}');
+      await user.sendEmailVerification();
+      print('✓ Verification email sent successfully');
+    } catch (e) {
+      print('❌ Error sending verification email: $e');
+      rethrow;
+    }
   }
 
   Future<void> reloadUser() async {

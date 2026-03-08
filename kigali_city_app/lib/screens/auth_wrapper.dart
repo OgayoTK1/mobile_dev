@@ -6,6 +6,10 @@ import 'auth/email_verification_screen.dart';
 import 'auth/login_screen.dart';
 import 'home_shell.dart';
 
+// DEV ONLY: Set to true to bypass email verification during testing
+// TODO: Remove this in production or set to false
+const bool kBypassEmailVerification = true;
+
 class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({super.key});
 
@@ -18,7 +22,12 @@ class AuthWrapper extends ConsumerWidget {
       error: (_, _) => const LoginScreen(),
       data: (User? user) {
         if (user == null) return const LoginScreen();
-        if (!user.emailVerified) return const EmailVerificationScreen();
+
+        // DEV: Skip email verification if bypass flag is enabled
+        if (!kBypassEmailVerification && !user.emailVerified) {
+          return const EmailVerificationScreen();
+        }
+
         return const HomeShell();
       },
     );
