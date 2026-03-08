@@ -6,6 +6,10 @@ import '../../models/listing.dart';
 import '../../providers/app_providers.dart';
 import '../detail/listing_detail_screen.dart';
 
+// Set to true once Maps SDK for Android is enabled in Google Cloud Console
+// for project: kigali-city-directory-39aad
+const bool kMapsEnabled = false;
+
 class MapViewScreen extends ConsumerStatefulWidget {
   const MapViewScreen({super.key});
 
@@ -54,8 +58,39 @@ class _MapViewScreenState extends ConsumerState<MapViewScreen> {
         .toSet();
   }
 
+  Widget _buildMapUnavailable() {
+    return const Center(
+      child: Padding(
+        padding: EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.map_outlined, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              'Map unavailable',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Maps SDK for Android needs to be enabled in Google Cloud Console.',
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (!kMapsEnabled) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Map View')),
+        body: _buildMapUnavailable(),
+      );
+    }
+
     final listingsAsync = ref.watch(allListingsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Map View')),

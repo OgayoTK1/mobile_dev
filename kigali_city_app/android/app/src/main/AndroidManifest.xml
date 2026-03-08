@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Permissions for Google Maps and location -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
@@ -8,9 +9,10 @@
         android:label="Kigali City Directory"
         android:icon="@mipmap/ic_launcher">
 
+        <!-- Google Maps API Key -->
         <meta-data
             android:name="com.google.android.geo.API_KEY"
-            android:value="AIzaSyATsG_LLqqAXaSFnfUw1lh-sQQ0tIIwDGs"/>
+            android:value="AIzaSyDzyjCYD3wZ4Yj9yMgvU_60uRE0Im6bBJI"/>
 
         <activity
             android:name=".MainActivity"
