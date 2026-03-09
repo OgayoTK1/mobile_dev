@@ -96,9 +96,20 @@ class AuthRepository {
     await _authService.sendEmailVerification();
   }
 
+  /// Alias for resendVerificationEmail().
+  Future<void> sendVerificationEmail() async {
+    await _authService.sendEmailVerification();
+  }
+
   /// Reloads the Firebase Auth user token and returns whether
   /// the email address is now verified.
   Future<bool> refreshUser() async {
+    await _authService.reloadUser();
+    return _authService.isEmailVerified;
+  }
+
+  /// Alias for refreshUser() — reloads and checks email verification.
+  Future<bool> checkEmailVerified() async {
     await _authService.reloadUser();
     return _authService.isEmailVerified;
   }

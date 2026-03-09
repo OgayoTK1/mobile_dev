@@ -1,9 +1,23 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/utils/helpers.dart';
 import '../../providers/app_providers.dart';
 
+/// ──────────────────────────────────────────────────────────────
+/// Email Verification Screen
+///
+/// Displayed when user is authenticated but email is NOT verified.
+/// This screen BLOCKS access to the Directory and all main screens.
+///
+/// Flow:
+///   1. User sees this screen after signup
+///   2. They check their email and click the verification link
+///   3. They come back and tap "I've Verified My Email"
+///   4. App calls reloadUser() to refresh the emailVerified flag
+///   5. If verified → auth wrapper routes to main app
+///   6. If not verified → shows error message
+/// ──────────────────────────────────────────────────────────────
 class EmailVerificationScreen extends ConsumerStatefulWidget {
   const EmailVerificationScreen({super.key});
 
@@ -14,33 +28,45 @@ class EmailVerificationScreen extends ConsumerStatefulWidget {
 
 class _EmailVerificationScreenState
     extends ConsumerState<EmailVerificationScreen> {
-  Timer? _timer;
+  bool _isChecking = false;
   bool _isResending = false;
 
-  @override
-  void initState() {
-    super.initState();
-    // Poll Firebase every 3 seconds to check if the user verified their email.
-    _timer = Timer.periodic(const Duration(seconds: 3), (_) async {
-      await ref.read(authRepositoryProvider).refreshUser();
-    });
-  }
+  Future<void> _checkVerification() async {
+    setState(() => _isChecking = true);
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _resend() async {
-    setState(() => _isResending = true);
     try {
-      await ref.read(authRepositoryProvider).resendVerificationEmail();
+      final authRepo = ref.read(authRepositoryProvider);
+      final isVerified = await authRepo.checkEmailVerified();
+
+      if (!isVerified && mounted) {
+        showErrorSnackbar(
+          context,
+          'Email not yet verified. Please check your inbox.',
+        );
+      }
+      // If verified, authStateChanges will emit and the auth
+      // wrapper will automatically navigate to the main app.
+    } catch (e) {
       if (mounted) {
-        showSuccessSnackbar(context, 'Verification email sent');
+        showErrorSnackbar(context, 'Error checking verification status.');
+      }
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
+  }
+
+  Future<void> _resendVerification() async {
+    setState(() => _isResending = true);
+
+    try {
+      await ref.read(authRepositoryProvider).sendVerificationEmail();
+      if (mounted) {
+        showSuccessSnackbar(context, 'Verification email sent!');
       }
     } catch (e) {
-      if (mounted) showErrorSnackbar(context, e.toString());
+      if (mounted) {
+        showErrorSnackbar(context, 'Could not send verification email.');
+      }
     } finally {
       if (mounted) setState(() => _isResending = false);
     }
@@ -49,69 +75,87 @@ class _EmailVerificationScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Verify Email')),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Icon(Icons.mark_email_unread_outlined, size: 80),
-            const SizedBox(height: 24),
-            Text(
-              'Check your inbox',
-              style: Theme.of(context).textTheme.headlineSmall,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              "We've sent a verification link to your email address. "
-              'Please click the link to continue.',
-              style: Theme.of(context).textTheme.bodyMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            ElevatedButton(
-              onPressed: _isResending ? null : _resend,
-              child: _isResending
-                  ? const SizedBox(
-                      height: 20,
-                      width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Text('Resend Email'),
-            ),
-            const SizedBox(height: 16),
-            TextButton(
-              onPressed: () => ref.read(authRepositoryProvider).signOut(),
-              child: const Text('Sign Out'),
-            ),
-            const SizedBox(height: 32),
-            // DEV ONLY: Bypass email verification for testing
-            OutlinedButton(
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.orange,
-                side: const BorderSide(color: Colors.orange),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.mark_email_unread,
+                size: 72,
+                color: AppColors.accent,
               ),
-              onPressed: () async {
-                // Manually mark email as verified in Firebase (dev workaround)
-                final user = ref.read(authRepositoryProvider).currentUser;
-                if (user != null) {
-                  // This won't actually verify the email in Firebase, but will
-                  // let us proceed for testing. In production, remove this button.
-                  if (mounted) {
-                    showSuccessSnackbar(
-                      context,
-                      '⚠️ Dev bypass: Proceeding without verification',
-                    );
-                  }
-                  // Force a sign out and sign in to refresh the auth state
-                  // This is a workaround - the proper fix is to get Firebase emails working
-                }
-              },
-              child: const Text('🔧 Skip Verification (Dev Only)'),
-            ),
-          ],
+              const SizedBox(height: 24),
+              const Text(
+                'Verify Your Email',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'We sent a verification link to your email address. '
+                'Please click the link to verify your account.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textMuted,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 36),
+
+              // Check verification button
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isChecking ? null : _checkVerification,
+                  child: _isChecking
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.backgroundDarker,
+                          ),
+                        )
+                      : const Text("I've Verified My Email"),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Resend button
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: _isResending ? null : _resendVerification,
+                  child: _isResending
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.accent,
+                          ),
+                        )
+                      : const Text('Resend Verification Email'),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Sign out
+              TextButton(
+                onPressed: () => ref.read(authRepositoryProvider).signOut(),
+                child: const Text(
+                  'Sign Out',
+                  style: TextStyle(color: AppColors.textDim),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
