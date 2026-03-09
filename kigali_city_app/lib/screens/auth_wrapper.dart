@@ -1,33 +1,66 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/app_providers.dart';
-import 'auth/email_verification_screen.dart';
+import '../widgets/common_widgets.dart';
 import 'auth/login_screen.dart';
+import 'auth/email_verification_screen.dart';
 import 'home_shell.dart';
 
-// DEV ONLY: Set to true to bypass email verification during testing
-// TODO: Remove this in production or set to false
-const bool kBypassEmailVerification = true;
-
+/// ──────────────────────────────────────────────────────────────
+/// Auth Wrapper
+///
+/// Top-level widget that routes the user based on auth state.
+/// This is the single point where authentication and email
+/// verification are enforced.
+///
+/// Routing logic:
+///   authStateProvider → AsyncValue User? → Widget
+///     ├── AsyncLoading  → AppLoadingWidget (spinner)
+///     ├── AsyncLoading  → Loading spinner
+///     ├── AsyncError    → Error screen with retry
+///     ├── AsyncData(null) → LoginScreen (not authenticated)
+///     └── AsyncData(user)
+///           ├── user.emailVerified == false → EmailVerificationScreen
+///           └── user.emailVerified == true  → HomeShell (main app)
+///
+/// The user CANNOT access the Directory, My Listings, Map, or
+/// Settings screens unless:
+///   1. They are signed in (Firebase Auth)
+///   2. Their email is verified (emailVerified == true)
+/// ──────────────────────────────────────────────────────────────
 class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authStateProvider);
+
     return authState.when(
+      // ─── Loading ─────────────────────────────────────────
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
-      error: (_, _) => const LoginScreen(),
-      data: (User? user) {
-        if (user == null) return const LoginScreen();
 
-        // DEV: Skip email verification if bypass flag is enabled
-        if (!kBypassEmailVerification && !user.emailVerified) {
+      // ─── Error ───────────────────────────────────────────
+      error: (error, _) => Scaffold(
+        body: AppErrorWidget(
+          message: 'Authentication error: $error',
+          onRetry: () => ref.invalidate(authStateProvider),
+        ),
+      ),
+
+      // ─── Data ────────────────────────────────────────────
+      data: (user) {
+        // Not authenticated → Login
+        if (user == null) {
+          return const LoginScreen();
+        }
+
+        // Authenticated but email NOT verified → Verification
+        if (!user.emailVerified) {
           return const EmailVerificationScreen();
         }
 
+        // Authenticated AND verified → Main App
         return const HomeShell();
       },
     );
