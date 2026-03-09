@@ -1,32 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/listing.dart';
-import '../../widgets/common_widgets.dart'; // add — provides StarRating
+import '../../widgets/common_widgets.dart';
 
-/// ──────────────────────────────────────────────────────────────
-/// Listing Detail Screen
-///
-/// Shows full details of a listing including:
-///   - Name, category, description
-///   - Address and contact info
-///   - Google Map with marker at listing coordinates
-///   - Navigation button to open Google Maps directions
-///
-/// How coordinates flow from Firestore → Map:
-///   1. Listing model stores latitude/longitude as double
-///   2. Listing.fromFirestore() parses them from Firestore doc
-///   3. This screen receives the Listing object
-///   4. GoogleMap widget uses LatLng(listing.latitude, listing.longitude)
-///   5. A Marker is placed at those exact coordinates
-///
-/// Why coordinates must be stored as double:
-///   - LatLng constructor requires double values
-///   - Firestore number type maps naturally to Dart double
-///   - String coordinates would need parsing (error-prone)
-///   - Mathematical operations (distance calc) need doubles
-/// ──────────────────────────────────────────────────────────────
 class ListingDetailScreen extends StatelessWidget {
   final Listing listing;
 
@@ -34,17 +13,18 @@ class ListingDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Guard nullable lat/lng
     final double lat = listing.latitude ?? 0.0;
     final double lng = listing.longitude ?? 0.0;
     final LatLng position = LatLng(lat, lng);
+    final bool hasValidCoords = listing.hasLocation;
 
     return Scaffold(
-      appBar: AppBar(title: Text(listing.name)), // name not title
+      appBar: AppBar(title: Text(listing.name)),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ─── Header card ───────────────────────────────────
             Container(
               width: double.infinity,
               margin: const EdgeInsets.all(16),
@@ -100,87 +80,130 @@ class ListingDetailScreen extends StatelessWidget {
               ),
             ),
 
+            // ─── Info tiles ────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
-                  _buildInfoTile(Icons.location_on, 'Address', listing.address),
-                  const SizedBox(height: 10),
-                  _buildInfoTile(Icons.phone, 'Contact', listing.contactNumber),
+                  _buildInfoTile(
+                    Icons.location_on,
+                    'Address',
+                    listing.address,
+                  ),
                   const SizedBox(height: 10),
                   _buildInfoTile(
-                    Icons.gps_fixed,
-                    'Coordinates',
-                    // safe null-aware calls
-                    '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+                    Icons.phone,
+                    'Contact',
+                    listing.contactNumber,
                   ),
+                  if (hasValidCoords) ...[
+                    const SizedBox(height: 10),
+                    _buildInfoTile(
+                      Icons.gps_fixed,
+                      'Coordinates',
+                      '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
+                    ),
+                  ],
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Location',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(16),
-                    child: SizedBox(
-                      height: 200,
-                      child: GoogleMap(
-                        initialCameraPosition: CameraPosition(
-                          target: position,
-                          zoom: 15,
-                        ),
-                        markers: {
-                          Marker(
-                            markerId: MarkerId(listing.id),
-                            position: position,
-                            infoWindow: InfoWindow(
-                              title: listing.name,
-                              snippet: listing.address,
-                            ),
-                          ),
-                        },
-                        zoomControlsEnabled: false,
-                        scrollGesturesEnabled: false,
-                        rotateGesturesEnabled: false,
-                        tiltGesturesEnabled: false,
-                        myLocationButtonEnabled: false,
-                        liteModeEnabled: true,
+            // ─── Map ───────────────────────────────────────────
+            if (hasValidCoords) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Location',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () => launchGoogleMapsNavigation(
-                    latitude: lat,
-                    longitude: lng,
-                    label: listing.name,
-                  ),
-                  icon: const Icon(Icons.navigation),
-                  label: const Text('Open in Google Maps'),
+                    const SizedBox(height: 10),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: SizedBox(
+                        height: 220,
+                        child: FlutterMap(
+                          options: MapOptions(
+                            initialCenter: position,
+                            initialZoom: 15,
+                            interactionOptions: const InteractionOptions(
+                              flags: InteractiveFlag.none,
+                            ),
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate:
+                                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'com.kigali.city_app',
+                            ),
+                            MarkerLayer(
+                              markers: [
+                                Marker(
+                                  point: position,
+                                  width: 48,
+                                  height: 48,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: AppColors.accent,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: Colors.white,
+                                        width: 2.5,
+                                      ),
+                                      boxShadow: const [
+                                        BoxShadow(
+                                          color: Colors.black26,
+                                          blurRadius: 6,
+                                          offset: Offset(0, 3),
+                                        ),
+                                      ],
+                                    ),
+                                    child: const Icon(
+                                      Icons.place,
+                                      color: Colors.white,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SimpleAttributionWidget(
+                              source: Text('OpenStreetMap contributors'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
+              const SizedBox(height: 16),
+
+              // ─── Open in Maps button ────────────────────────
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => launchGoogleMapsNavigation(
+                      latitude: lat,
+                      longitude: lng,
+                      label: listing.name,
+                    ),
+                    icon: const Icon(Icons.navigation),
+                    label: const Text('Open in Google Maps'),
+                  ),
+                ),
+              ),
+            ],
+
             const SizedBox(height: 32),
           ],
         ),

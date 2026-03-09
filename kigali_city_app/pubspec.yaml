@@ -21,8 +21,9 @@ dependencies:
   # State management
   flutter_riverpod: ^2.5.1
 
-  # Maps
-  google_maps_flutter: ^2.9.0
+  # Maps (flutter_map — OpenStreetMap, no API key required)
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
 
   # URL launching (phone, web, maps)
   url_launcher: ^6.3.0

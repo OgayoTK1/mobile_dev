@@ -1,6 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Permissions for Google Maps and location -->
+    <!-- Permissions for network (flutter_map tiles) and location -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
@@ -8,11 +8,6 @@
     <application
         android:label="Kigali City Directory"
         android:icon="@mipmap/ic_launcher">
-
-        <!-- Google Maps API Key (value injected from local.properties at build time) -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="${MAPS_API_KEY}"/>
 
         <activity
             android:name=".MainActivity"
