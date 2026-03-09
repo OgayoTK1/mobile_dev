@@ -1,16 +1,48 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'screens/auth_wrapper.dart';
-import 'firebase_options.dart';
 
+/// ──────────────────────────────────────────────────────────────
+/// Kigali City Services & Places Directory
+///
+/// Entry point for the Flutter application.
+///
+/// Initialization flow:
+///   1. WidgetsFlutterBinding.ensureInitialized()
+///      - Required before calling async code in main()
+///   2. Firebase.initializeApp()
+///      - Connects to Firebase project using google-services.json
+///        (Android) or GoogleService-Info.plist (iOS)
+///   3. ProviderScope wraps the entire app
+///      - Enables Riverpod dependency injection
+///      - All providers are accessible from any widget below this
+///   4. AuthWrapper handles routing based on auth state
+///
+/// Architecture summary:
+///   main.dart → AuthWrapper → LoginScreen / HomeShell
+///   HomeShell → BottomNav → Directory / MyListings / Map / Settings
+///   All data flows: Firestore → Service → Repository → Provider → UI
+/// ──────────────────────────────────────────────────────────────
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
+  await Firebase.initializeApp();
+
+  // Activate App Check — debug provider for dev/emulator,
+  // Play Integrity for release builds.
+  await FirebaseAppCheck.instance.activate(
+    androidProvider:
+        kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity,
   );
-  runApp(const ProviderScope(child: KigaliCityApp()));
+
+  runApp(
+    // ProviderScope is required for Riverpod.
+    // It stores the state of all providers.
+    const ProviderScope(child: KigaliCityApp()),
+  );
 }
 
 class KigaliCityApp extends StatelessWidget {
@@ -19,7 +51,7 @@ class KigaliCityApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Kigali City App',
+      title: 'Kigali City Directory',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: const AuthWrapper(),
