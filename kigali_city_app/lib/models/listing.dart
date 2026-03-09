@@ -1,121 +1,185 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../core/constants/app_constants.dart';
 
+/// ──────────────────────────────────────────────────────────────
+/// Listing model
+///
+/// Maps to: Firestore → listings/{listingId}
+/// Fields: name, category, address, contactNumber, description,
+///         latitude, longitude, createdBy, timestamp
+///
+/// IMPORTANT: latitude and longitude are stored as double in
+/// Firestore (not String). This is critical for Google Maps
+/// integration — LatLng requires double values. Storing them
+/// as strings would require parsing and risk NumberFormatException.
+/// ──────────────────────────────────────────────────────────────
 class Listing {
-  final String? listingId;
-  final String title;
-  final String description;
+  final String id;
+  final String name;
   final String category;
   final String address;
-  final String? phone;
-  final String? website;
-  final double? latitude;
-  final double? longitude;
-  final String ownerId;
-  final String ownerName;
-  final double rating;
-  final int reviewCount;
-  final String? imageUrl;
-  final DateTime? updatedAt;
+  final String contactNumber;
+  final String description;
+  final double latitude;
+  final double longitude;
+  final String createdBy;
+  final DateTime timestamp;
+  // Map this to your real image field:
+  // Example if your model has `image`:
+  String? get imageUrl => image;
+
+  // If instead you have a list, use:
+  // String? get imageUrl => images.isNotEmpty ? images.first : null;
+  final String? image;
   final bool isVerified;
+  final num? rating;
 
   const Listing({
-    this.listingId,
-    required this.title,
-    required this.description,
+    required this.id,
+    required this.name,
     required this.category,
     required this.address,
-    this.phone,
-    this.website,
-    this.latitude,
-    this.longitude,
-    required this.ownerId,
-    required this.ownerName,
-    this.rating = 0.0,
-    this.reviewCount = 0,
-    this.imageUrl,
-    this.updatedAt,
+    required this.contactNumber,
+    required this.description,
+    required this.latitude,
+    required this.longitude,
+    required this.createdBy,
+    required this.timestamp,
+    this.image,
     this.isVerified = false,
+    this.rating,
   });
 
-  bool get hasLocation => latitude != null && longitude != null;
-
+  /// Creates a Listing from a Firestore document snapshot.
+  ///
+  /// Coordinates are explicitly cast to double using .toDouble()
+  /// to handle cases where Firestore may return int or num types.
   factory Listing.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return Listing(
-      listingId: doc.id,
-      title: data[FirestoreFields.title] as String? ?? '',
-      description: data[FirestoreFields.description] as String? ?? '',
-      category: data[FirestoreFields.category] as String? ?? '',
-      address: data[FirestoreFields.address] as String? ?? '',
-      phone: data[FirestoreFields.phone] as String?,
-      website: data[FirestoreFields.website] as String?,
-      latitude: (data[FirestoreFields.latitude] as num?)?.toDouble(),
-      longitude: (data[FirestoreFields.longitude] as num?)?.toDouble(),
-      ownerId: data[FirestoreFields.ownerId] as String? ?? '',
-      ownerName: data[FirestoreFields.ownerName] as String? ?? '',
-      rating: (data[FirestoreFields.rating] as num?)?.toDouble() ?? 0.0,
-      reviewCount: data[FirestoreFields.reviewCount] as int? ?? 0,
-      imageUrl: data[FirestoreFields.imageUrl] as String?,
-      updatedAt: data[FirestoreFields.updatedAt] != null
-          ? (data[FirestoreFields.updatedAt] as Timestamp).toDate()
-          : null,
-      isVerified: data[FirestoreFields.isVerified] as bool? ?? false,
+      id: doc.id,
+      name: data['name'] ?? '',
+      category: data['category'] ?? '',
+      address: data['address'] ?? '',
+      contactNumber: data['contactNumber'] ?? '',
+      description: data['description'] ?? '',
+      latitude: (data['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (data['longitude'] as num?)?.toDouble() ?? 0.0,
+      createdBy: data['createdBy'] ?? '',
+      timestamp: (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      image: data['image'] ?? '',
+      isVerified: data['isVerified'] as bool? ?? false,
+      rating:
+          (data['rating'] as num?) ??
+          (data['averageRating'] as num?) ??
+          (data['avg_rating'] as num?),
     );
   }
 
+  /// Converts to a Firestore-compatible map.
+  /// Uses FieldValue.serverTimestamp() for the timestamp field
+  /// so the server determines the exact time (avoids client clock issues).
   Map<String, dynamic> toFirestore() {
     return {
-      FirestoreFields.title: title,
-      FirestoreFields.description: description,
-      FirestoreFields.category: category,
-      FirestoreFields.address: address,
-      FirestoreFields.phone: phone,
-      FirestoreFields.website: website,
-      FirestoreFields.latitude: latitude,
-      FirestoreFields.longitude: longitude,
-      FirestoreFields.ownerId: ownerId,
-      FirestoreFields.ownerName: ownerName,
-      FirestoreFields.rating: rating,
-      FirestoreFields.reviewCount: reviewCount,
-      FirestoreFields.imageUrl: imageUrl,
-      FirestoreFields.updatedAt: FieldValue.serverTimestamp(),
-      FirestoreFields.isVerified: isVerified,
+      'name': name,
+      'category': category,
+      'address': address,
+      'contactNumber': contactNumber,
+      'description': description,
+      'latitude': latitude,
+      'longitude': longitude,
+      'createdBy': createdBy,
+      'timestamp': FieldValue.serverTimestamp(),
+      'image': image,
+      'isVerified': isVerified,
+      'rating': rating,
     };
   }
 
+  /// Creates a copy with optional field overrides.
   Listing copyWith({
-    String? listingId,
-    String? title,
-    String? description,
+    String? id,
+    String? name,
     String? category,
     String? address,
-    String? phone,
-    String? website,
+    String? contactNumber,
+    String? description,
     double? latitude,
     double? longitude,
-    double? rating,
-    int? reviewCount,
-    String? imageUrl,
+    String? createdBy,
+    DateTime? timestamp,
+    String? image,
     bool? isVerified,
+    num? rating,
   }) {
     return Listing(
-      listingId: listingId ?? this.listingId,
-      title: title ?? this.title,
-      description: description ?? this.description,
+      id: id ?? this.id,
+      name: name ?? this.name,
       category: category ?? this.category,
       address: address ?? this.address,
-      phone: phone ?? this.phone,
-      website: website ?? this.website,
+      contactNumber: contactNumber ?? this.contactNumber,
+      description: description ?? this.description,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
-      ownerId: ownerId,
-      ownerName: ownerName,
-      rating: rating ?? this.rating,
-      reviewCount: reviewCount ?? this.reviewCount,
-      imageUrl: imageUrl ?? this.imageUrl,
-      updatedAt: updatedAt,
+      createdBy: createdBy ?? this.createdBy,
+      timestamp: timestamp ?? this.timestamp,
+      image: image ?? this.image,
       isVerified: isVerified ?? this.isVerified,
+      rating: rating ?? this.rating,
     );
+  }
+
+  // Compatibility getter for UI code expecting `title`
+  String get title => name;
+
+  @override
+  String toString() => 'Listing(id: $id, name: $name, category: $category)';
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is Listing && runtimeType == other.runtimeType && id == other.id;
+
+  @override
+  int get hashCode => id.hashCode;
+
+  /// Creates a Listing from a JSON map.
+  factory Listing.fromJson(Map<String, dynamic> json) {
+    return Listing(
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      category: json['category'] ?? '',
+      address: json['address'] ?? '',
+      contactNumber: json['contactNumber'] ?? '',
+      description: json['description'] ?? '',
+      latitude: (json['latitude'] as num?)?.toDouble() ?? 0.0,
+      longitude: (json['longitude'] as num?)?.toDouble() ?? 0.0,
+      createdBy: json['createdBy'] ?? '',
+      timestamp: (json['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now(),
+      image: json['image'] ?? '',
+      isVerified: json['isVerified'] as bool? ?? false,
+      rating:
+          (json['rating'] as num?) ??
+          (json['averageRating'] as num?) ??
+          (json['avg_rating'] as num?),
+    );
+  }
+
+  /// Converts a Listing to a JSON map.
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'category': category,
+      'address': address,
+      'contactNumber': contactNumber,
+      'description': description,
+      'latitude': latitude,
+      'longitude': longitude,
+      'createdBy': createdBy,
+      'timestamp': timestamp,
+      'image': imageUrl,
+      'isVerified': isVerified,
+      'rating': rating,
+    };
   }
 }

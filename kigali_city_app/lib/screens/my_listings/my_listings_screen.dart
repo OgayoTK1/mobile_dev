@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
@@ -7,30 +9,72 @@ import '../../providers/app_providers.dart';
 import '../../widgets/common_widgets.dart';
 import '../detail/listing_detail_screen.dart';
 
+/// ──────────────────────────────────────────────────────────────
+/// My Listings Screen
+///
+/// Shows listings created by the current user (createdBy == uid).
+/// Provides full CRUD operations:
+///   ✅ Create: FAB → bottom sheet form
+///   ✅ Read: Real-time stream via myListingsStreamProvider
+///   ✅ Update: Edit button → pre-filled bottom sheet form
+///   ✅ Delete: Delete button with confirmation dialog
+///
+/// Ownership enforcement:
+///   - App level: Only shows listings where createdBy == uid
+///   - Firestore rules: Validates request.auth.uid == resource.data.createdBy
+/// ──────────────────────────────────────────────────────────────
 class MyListingsScreen extends ConsumerWidget {
   const MyListingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final listingsAsync = ref.watch(userListingsProvider);
+    final myListingsAsync = ref.watch(myListingsStreamProvider);
+
     return Scaffold(
       appBar: AppBar(title: const Text('My Listings')),
       floatingActionButton: FloatingActionButton(
+        backgroundColor: AppColors.accent,
+        foregroundColor: AppColors.backgroundDarker,
         onPressed: () => _showListingForm(context, ref),
         child: const Icon(Icons.add),
       ),
-      body: listingsAsync.when(
+      body: myListingsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
+        error: (error, _) => AppErrorWidget(
+          message: 'Failed to load listings: $error',
+          onRetry: () => ref.invalidate(myListingsStreamProvider),
+        ),
         data: (listings) {
           if (listings.isEmpty) {
-            return const Center(
-              child: Text('No listings yet. Tap + to add one.'),
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.list_alt, size: 64, color: AppColors.textDim),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'No listings yet',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Tap + to create your first listing',
+                    style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
             );
           }
-          return ListView.builder(
-            padding: const EdgeInsets.all(12),
+
+          return ListView.separated(
+            padding: const EdgeInsets.all(16),
             itemCount: listings.length,
+            separatorBuilder: (_, __) =>
+                Divider(color: AppColors.border.withOpacity(0.3), height: 1),
             itemBuilder: (context, index) {
               final listing = listings[index];
               return ListingCard(
@@ -41,20 +85,8 @@ class MyListingsScreen extends ConsumerWidget {
                     builder: (_) => ListingDetailScreen(listing: listing),
                   ),
                 ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit),
-                      onPressed: () =>
-                          _showListingForm(context, ref, listing: listing),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _confirmDelete(context, ref, listing),
-                    ),
-                  ],
-                ),
+                onEdit: () => _showListingForm(context, ref, listing: listing),
+                onDelete: () => _confirmDelete(context, ref, listing),
               );
             },
           );
@@ -63,34 +95,7 @@ class MyListingsScreen extends ConsumerWidget {
     );
   }
 
-  void _confirmDelete(BuildContext context, WidgetRef ref, Listing listing) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Listing'),
-        content: Text('Delete "${listing.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await ref
-                  .read(listingRepositoryProvider)
-                  .removeListing(listing.listingId!);
-              if (context.mounted) {
-                SnackbarHelper.showSuccess(context, 'Listing deleted');
-              }
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
-  }
-
+  /// Shows a bottom sheet form for creating or editing a listing.
   void _showListingForm(
     BuildContext context,
     WidgetRef ref, {
@@ -99,113 +104,167 @@ class MyListingsScreen extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (_) => ListingFormSheet(listing: listing),
+      backgroundColor: AppColors.backgroundCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => _ListingFormSheet(listing: listing),
+    );
+  }
+
+  /// Shows a confirmation dialog before deleting a listing.
+  void _confirmDelete(BuildContext context, WidgetRef ref, Listing listing) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.backgroundCard,
+        title: const Text(
+          'Delete Listing',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          'Are you sure you want to delete "${listing.name}"? This action cannot be undone.',
+          style: const TextStyle(color: AppColors.textMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textMuted),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(ctx);
+              try {
+                await ref
+                    .read(listingRepositoryProvider)
+                    .deleteListing(listing.id);
+                if (context.mounted) {
+                  showSuccessSnackbar(context, 'Listing deleted');
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  showErrorSnackbar(context, 'Failed to delete: $e');
+                }
+              }
+            },
+            child: const Text(
+              'Delete',
+              style: TextStyle(color: AppColors.error),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-class ListingFormSheet extends ConsumerStatefulWidget {
+/// ──────────────────────────────────────────────────────────────
+/// Listing Form Bottom Sheet (Create / Update)
+/// ──────────────────────────────────────────────────────────────
+class _ListingFormSheet extends ConsumerStatefulWidget {
   final Listing? listing;
 
-  const ListingFormSheet({super.key, this.listing});
+  const _ListingFormSheet({this.listing});
 
   @override
-  ConsumerState<ListingFormSheet> createState() => _ListingFormSheetState();
+  ConsumerState<_ListingFormSheet> createState() => _ListingFormSheetState();
 }
 
-class _ListingFormSheetState extends ConsumerState<ListingFormSheet> {
+class _ListingFormSheetState extends ConsumerState<_ListingFormSheet> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _titleCtrl;
-  late final TextEditingController _descCtrl;
-  late final TextEditingController _addressCtrl;
-  late final TextEditingController _phoneCtrl;
-  late final TextEditingController _websiteCtrl;
-  late final TextEditingController _latCtrl;
-  late final TextEditingController _lngCtrl;
-  late String _selectedCategory;
+  late TextEditingController _nameController;
+  late TextEditingController _addressController;
+  late TextEditingController _contactController;
+  late TextEditingController _descriptionController;
+  late TextEditingController _latController;
+  late TextEditingController _lngController;
+  String _selectedCategory = AppCategories.all.first;
   bool _isLoading = false;
+
+  bool get _isEditing => widget.listing != null;
 
   @override
   void initState() {
     super.initState();
     final l = widget.listing;
-    _titleCtrl = TextEditingController(text: l?.title);
-    _descCtrl = TextEditingController(text: l?.description);
-    _addressCtrl = TextEditingController(text: l?.address);
-    _phoneCtrl = TextEditingController(text: l?.phone);
-    _websiteCtrl = TextEditingController(text: l?.website);
-    _latCtrl = TextEditingController(text: l?.latitude?.toString());
-    _lngCtrl = TextEditingController(text: l?.longitude?.toString());
-    _selectedCategory = l?.category ?? kCategories[1];
+    _nameController = TextEditingController(text: l?.name ?? '');
+    _addressController = TextEditingController(text: l?.address ?? '');
+    _contactController = TextEditingController(text: l?.contactNumber ?? '');
+    _descriptionController = TextEditingController(text: l?.description ?? '');
+    _latController = TextEditingController(
+      text: l?.latitude.toString() ?? '-1.9403',
+    );
+    _lngController = TextEditingController(
+      text: l?.longitude.toString() ?? '30.0619',
+    );
+    if (l != null) _selectedCategory = l.category;
   }
 
   @override
   void dispose() {
-    _titleCtrl.dispose();
-    _descCtrl.dispose();
-    _addressCtrl.dispose();
-    _phoneCtrl.dispose();
-    _websiteCtrl.dispose();
-    _latCtrl.dispose();
-    _lngCtrl.dispose();
+    _nameController.dispose();
+    _addressController.dispose();
+    _contactController.dispose();
+    _descriptionController.dispose();
+    _latController.dispose();
+    _lngController.dispose();
     super.dispose();
   }
 
-  Future<void> _save() async {
+  Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _isLoading = true);
+
     try {
-      final user = ref.read(currentUserProvider)!;
-      final profile = await ref
-          .read(firestoreServiceProvider)
-          .getUserProfile(user.uid);
+      final user = ref.read(authStateProvider).valueOrNull;
+      if (user == null) throw Exception('Not authenticated');
+
       final repo = ref.read(listingRepositoryProvider);
 
-      final phone = _phoneCtrl.text.trim().isEmpty
-          ? null
-          : _phoneCtrl.text.trim();
-      final website = _websiteCtrl.text.trim().isEmpty
-          ? null
-          : _websiteCtrl.text.trim();
-      final lat = double.tryParse(_latCtrl.text);
-      final lng = double.tryParse(_lngCtrl.text);
-
-      if (widget.listing == null) {
-        final listing = Listing(
-          title: _titleCtrl.text.trim(),
-          description: _descCtrl.text.trim(),
-          category: _selectedCategory,
-          address: _addressCtrl.text.trim(),
-          phone: phone,
-          website: website,
-          latitude: lat,
-          longitude: lng,
-          ownerId: user.uid,
-          ownerName: profile?.displayName ?? user.email ?? '',
-        );
-        await repo.addListing(listing);
-      } else {
-        await repo.editListing(widget.listing!.listingId!, {
-          FirestoreFields.title: _titleCtrl.text.trim(),
-          FirestoreFields.description: _descCtrl.text.trim(),
-          FirestoreFields.category: _selectedCategory,
-          FirestoreFields.address: _addressCtrl.text.trim(),
-          FirestoreFields.phone: phone,
-          FirestoreFields.website: website,
-          FirestoreFields.latitude: lat,
-          FirestoreFields.longitude: lng,
+      if (_isEditing) {
+        // UPDATE existing listing
+        await repo.updateListing(widget.listing!.id, {
+          'name': _nameController.text.trim(),
+          'category': _selectedCategory,
+          'address': _addressController.text.trim(),
+          'contactNumber': _contactController.text.trim(),
+          'description': _descriptionController.text.trim(),
+          'latitude': double.parse(_latController.text.trim()),
+          'longitude': double.parse(_lngController.text.trim()),
         });
-      }
 
-      if (mounted) {
-        Navigator.pop(context);
-        SnackbarHelper.showSuccess(
-          context,
-          widget.listing == null ? 'Listing created' : 'Listing updated',
+        if (mounted) {
+          Navigator.pop(context);
+          showSuccessSnackbar(context, 'Listing updated!');
+        }
+      } else {
+        // CREATE new listing
+        final listing = Listing(
+          id: '', // Firestore generates the ID
+          name: _nameController.text.trim(),
+          category: _selectedCategory,
+          address: _addressController.text.trim(),
+          contactNumber: _contactController.text.trim(),
+          description: _descriptionController.text.trim(),
+          latitude: double.parse(_latController.text.trim()),
+          longitude: double.parse(_lngController.text.trim()),
+          createdBy: user.uid,
+          timestamp: DateTime.now(),
         );
+
+        await repo.createListing(listing);
+
+        if (mounted) {
+          Navigator.pop(context);
+          showSuccessSnackbar(context, 'Listing created!');
+        }
       }
     } catch (e) {
-      if (mounted) SnackbarHelper.showError(context, e.toString());
+      if (mounted) showErrorSnackbar(context, 'Error: $e');
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -215,98 +274,147 @@ class _ListingFormSheetState extends ConsumerState<ListingFormSheet> {
   Widget build(BuildContext context) {
     return Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
       ),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
         child: Form(
           key: _formKey,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                widget.listing == null ? 'Add Listing' : 'Edit Listing',
-                style: Theme.of(context).textTheme.titleLarge,
+              // Handle bar
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppColors.textDim,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
               ),
               const SizedBox(height: 16),
+
+              Text(
+                _isEditing ? 'Edit Listing' : 'New Listing',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // Name
               TextFormField(
-                controller: _titleCtrl,
-                decoration: const InputDecoration(labelText: 'Title *'),
-                validator: (v) => Validators.required(v, 'Title'),
+                controller: _nameController,
+                decoration: const InputDecoration(hintText: 'Service Name'),
+                style: const TextStyle(color: AppColors.textPrimary),
+                validator: (v) => Validators.required(v, 'Name'),
               ),
               const SizedBox(height: 12),
-              TextFormField(
-                controller: _descCtrl,
-                decoration: const InputDecoration(labelText: 'Description *'),
-                validator: (v) => Validators.required(v, 'Description'),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 12),
+
+              // Category Dropdown
               DropdownButtonFormField<String>(
-                initialValue: _selectedCategory,
-                decoration: const InputDecoration(labelText: 'Category'),
-                items: kCategories
-                    .where((c) => c != 'All')
-                    .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                value: _selectedCategory,
+                dropdownColor: AppColors.backgroundCard,
+                decoration: const InputDecoration(hintText: 'Category'),
+                items: AppCategories.all
+                    .map(
+                      (c) => DropdownMenuItem(
+                        value: c,
+                        child: Text(
+                          c,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                        ),
+                      ),
+                    )
                     .toList(),
                 onChanged: (v) => setState(() => _selectedCategory = v!),
               ),
               const SizedBox(height: 12),
+
+              // Address
               TextFormField(
-                controller: _addressCtrl,
-                decoration: const InputDecoration(labelText: 'Address *'),
+                controller: _addressController,
+                decoration: const InputDecoration(hintText: 'Address'),
+                style: const TextStyle(color: AppColors.textPrimary),
                 validator: (v) => Validators.required(v, 'Address'),
               ),
               const SizedBox(height: 12),
+
+              // Contact
               TextFormField(
-                controller: _phoneCtrl,
-                decoration: const InputDecoration(labelText: 'Phone'),
-                validator: Validators.phone,
+                controller: _contactController,
+                decoration: const InputDecoration(hintText: 'Contact Number'),
+                style: const TextStyle(color: AppColors.textPrimary),
                 keyboardType: TextInputType.phone,
+                validator: (v) => Validators.required(v, 'Contact'),
               ),
               const SizedBox(height: 12),
+
+              // Description
               TextFormField(
-                controller: _websiteCtrl,
-                decoration: const InputDecoration(labelText: 'Website'),
-                keyboardType: TextInputType.url,
+                controller: _descriptionController,
+                decoration: const InputDecoration(hintText: 'Description'),
+                style: const TextStyle(color: AppColors.textPrimary),
+                maxLines: 3,
+                validator: (v) => Validators.required(v, 'Description'),
               ),
               const SizedBox(height: 12),
+
+              // Lat / Lng
               Row(
                 children: [
                   Expanded(
                     child: TextFormField(
-                      controller: _latCtrl,
-                      decoration: const InputDecoration(labelText: 'Latitude'),
+                      controller: _latController,
+                      decoration: const InputDecoration(hintText: 'Latitude'),
+                      style: const TextStyle(color: AppColors.textPrimary),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                         signed: true,
                       ),
+                      validator: Validators.latitude,
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextFormField(
-                      controller: _lngCtrl,
-                      decoration: const InputDecoration(labelText: 'Longitude'),
+                      controller: _lngController,
+                      decoration: const InputDecoration(hintText: 'Longitude'),
+                      style: const TextStyle(color: AppColors.textPrimary),
                       keyboardType: const TextInputType.numberWithOptions(
                         decimal: true,
                         signed: true,
                       ),
+                      validator: Validators.longitude,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 24),
-              ElevatedButton(
-                onPressed: _isLoading ? null : _save,
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 20,
-                        width: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(widget.listing == null ? 'Create' : 'Save'),
+
+              // Submit
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _submit,
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: AppColors.backgroundDarker,
+                          ),
+                        )
+                      : Text(_isEditing ? 'Update Listing' : 'Create Listing'),
+                ),
               ),
             ],
           ),
