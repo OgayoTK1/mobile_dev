@@ -58,15 +58,10 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    final credential = await _auth.createUserWithEmailAndPassword(
+    return await _auth.createUserWithEmailAndPassword(
       email: email.trim(),
       password: password,
     );
-
-    // Send verification email immediately after signup
-    await credential.user?.sendEmailVerification();
-
-    return credential;
   }
 
   /// Sends a verification email to the current user.

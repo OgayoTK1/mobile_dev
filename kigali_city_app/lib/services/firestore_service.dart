@@ -63,58 +63,41 @@ class FirestoreService {
 
   /// CREATE: Adds a new listing to Firestore.
   /// Returns the generated document ID.
-  /// The timestamp is set server-side via FieldValue.serverTimestamp().
   Future<String> createListing(Listing listing) async {
-    final docRef = await _listingsRef.add(listing.toFirestore());
+    final data = listing.toFirestore();
+    data[FirestoreConstants.fieldUpdatedAt] = FieldValue.serverTimestamp();
+    final docRef = await _listingsRef.add(data);
     return docRef.id;
   }
 
   /// READ: Returns a real-time stream of ALL listings.
-  /// Ordered by timestamp descending (newest first).
-  ///
-  /// This stream is the backbone of the Directory screen.
-  /// Every time a listing is added, updated, or deleted anywhere,
-  /// this stream emits a new list and the UI rebuilds.
+  /// Ordered by updatedAt descending (newest first).
   Stream<List<Listing>> listingsStream() {
     return _listingsRef
-        .orderBy(FirestoreConstants.fieldTimestamp, descending: true)
+        .orderBy(FirestoreConstants.fieldUpdatedAt, descending: true)
         .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => Listing.fromFirestore(doc))
-              .toList();
-        });
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Listing.fromFirestore(doc)).toList());
   }
 
   /// READ: Stream of listings created by a specific user.
-  /// Used for the "My Listings" screen.
-  /// Filters at Firestore query level (server-side) for efficiency.
+  /// Filters by ownerId at Firestore query level (server-side).
   Stream<List<Listing>> myListingsStream(String uid) {
     return _listingsRef
-        .where(FirestoreConstants.fieldCreatedBy, isEqualTo: uid)
-        .orderBy(FirestoreConstants.fieldTimestamp, descending: true)
+        .where(FirestoreConstants.fieldOwnerId, isEqualTo: uid)
+        .orderBy(FirestoreConstants.fieldUpdatedAt, descending: true)
         .snapshots()
-        .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => Listing.fromFirestore(doc))
-              .toList();
-        });
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Listing.fromFirestore(doc)).toList());
   }
 
   /// UPDATE: Updates an existing listing.
-  /// Only fields present in the map are updated (merge behavior).
-  /// Ownership check (createdBy == currentUser.uid) is enforced
-  /// both in the app logic AND in Firestore security rules.
-  Future<void> updateListing(
-    String listingId,
-    Map<String, dynamic> data,
-  ) async {
-    data[FirestoreConstants.fieldTimestamp] = FieldValue.serverTimestamp();
+  Future<void> updateListing(String listingId, Map<String, dynamic> data) async {
+    data[FirestoreConstants.fieldUpdatedAt] = FieldValue.serverTimestamp();
     await _listingsRef.doc(listingId).update(data);
   }
 
   /// DELETE: Removes a listing from Firestore.
-  /// Ownership is enforced via Firestore security rules.
   Future<void> deleteListing(String listingId) async {
     await _listingsRef.doc(listingId).delete();
   }

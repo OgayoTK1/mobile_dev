@@ -51,7 +51,9 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 /// Provides ListingRepository with injected dependencies.
 final listingRepositoryProvider = Provider<ListingRepository>((ref) {
-  return ListingRepository();
+  return ListingRepository(
+    firestoreService: ref.read(firestoreServiceProvider),
+  );
 });
 
 // ─── Auth State Provider ─────────────────────────────────────

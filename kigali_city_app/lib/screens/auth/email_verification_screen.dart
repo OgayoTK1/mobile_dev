@@ -59,7 +59,7 @@ class _EmailVerificationScreenState
     setState(() => _isResending = true);
 
     try {
-      await ref.read(authRepositoryProvider).sendVerificationEmail();
+      await ref.read(authRepositoryProvider).resendVerificationEmail();
       if (mounted) {
         showSuccessSnackbar(context, 'Verification email sent!');
       }
