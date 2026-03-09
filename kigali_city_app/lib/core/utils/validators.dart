@@ -22,18 +22,20 @@ class Validators {
   }
 
   static String? latitude(String? value) {
-    if (value == null || value.isEmpty) return null;
+    if (value == null || value.isEmpty) return 'Latitude is required';
     final n = double.tryParse(value);
-    if (n == null || n < -90 || n > 90)
+    if (n == null || n < -90 || n > 90) {
       return 'Enter a valid latitude (-90 to 90)';
+    }
     return null;
   }
 
   static String? longitude(String? value) {
-    if (value == null || value.isEmpty) return null;
+    if (value == null || value.isEmpty) return 'Longitude is required';
     final n = double.tryParse(value);
-    if (n == null || n < -180 || n > 180)
+    if (n == null || n < -180 || n > 180) {
       return 'Enter a valid longitude (-180 to 180)';
+    }
     return null;
   }
 }

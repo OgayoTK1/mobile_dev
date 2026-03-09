@@ -51,9 +51,7 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 
 /// Provides ListingRepository with injected dependencies.
 final listingRepositoryProvider = Provider<ListingRepository>((ref) {
-  return ListingRepository(
-    firestoreService: ref.read(firestoreServiceProvider),
-  );
+  return ListingRepository();
 });
 
 // ─── Auth State Provider ─────────────────────────────────────
@@ -110,6 +108,9 @@ final listingsStreamProvider = StreamProvider<List<Listing>>((ref) {
   return ref.watch(listingRepositoryProvider).getListings();
 });
 
+// alias used by map_view_screen
+final allListingsProvider = listingsStreamProvider;
+
 /// Stream of listings created by the current user.
 /// Used for the "My Listings" screen.
 /// Returns empty stream if no user is logged in.
@@ -151,32 +152,22 @@ final selectedCategoryProvider = StateProvider<String?>((ref) => null);
 ///
 /// For a city directory with hundreds to low thousands of
 /// listings, local filtering is the pragmatic choice.
-final filteredListingsProvider = Provider<AsyncValue<List<Listing>>>((ref) {
+final filteredListingsProvider = Provider<List<Listing>>((ref) {
   final listingsAsync = ref.watch(listingsStreamProvider);
-  final searchQuery = ref.watch(searchQueryProvider).toLowerCase();
   final selectedCategory = ref.watch(selectedCategoryProvider);
+  final searchQuery = ref
+      .watch(searchQueryProvider)
+      .toLowerCase(); // keep if exists
 
-  return listingsAsync.when(
-    data: (listings) {
-      var filtered = listings;
-
-      // Apply category filter
-      if (selectedCategory != null && selectedCategory.isNotEmpty) {
-        filtered = filtered
-            .where((l) => l.category == selectedCategory)
-            .toList();
-      }
-
-      // Apply search filter (name match)
-      if (searchQuery.isNotEmpty) {
-        filtered = filtered
-            .where((l) => l.name.toLowerCase().contains(searchQuery))
-            .toList();
-      }
-
-      return AsyncValue.data(filtered);
-    },
-    loading: () => const AsyncValue.loading(),
-    error: (error, stack) => AsyncValue.error(error, stack),
+  return listingsAsync.maybeWhen(
+    data: (listings) => listings.where((l) {
+      final matchesCategory =
+          selectedCategory == null || l.category == selectedCategory;
+      final matchesSearch =
+          searchQuery.isEmpty ||
+          l.name.toLowerCase().contains(searchQuery); // fixed: name not title
+      return matchesCategory && matchesSearch;
+    }).toList(),
+    orElse: () => [],
   );
 });

@@ -37,10 +37,10 @@ class _EmailVerificationScreenState
     try {
       await ref.read(authRepositoryProvider).resendVerificationEmail();
       if (mounted) {
-        SnackbarHelper.showSuccess(context, 'Verification email sent');
+        showSuccessSnackbar(context, 'Verification email sent');
       }
     } catch (e) {
-      if (mounted) SnackbarHelper.showError(context, e.toString());
+      if (mounted) showErrorSnackbar(context, e.toString());
     } finally {
       if (mounted) setState(() => _isResending = false);
     }
@@ -100,7 +100,7 @@ class _EmailVerificationScreenState
                   // This won't actually verify the email in Firebase, but will
                   // let us proceed for testing. In production, remove this button.
                   if (mounted) {
-                    SnackbarHelper.showInfo(
+                    showSuccessSnackbar(
                       context,
                       '⚠️ Dev bypass: Proceeding without verification',
                     );

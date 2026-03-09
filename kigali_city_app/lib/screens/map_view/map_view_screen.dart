@@ -41,7 +41,7 @@ class _MapViewScreenState extends ConsumerState<MapViewScreen> {
         .where((l) => l.hasLocation)
         .map(
           (l) => Marker(
-            markerId: MarkerId(l.listingId ?? l.title),
+            markerId: MarkerId(l.listingId),
             position: LatLng(l.latitude!, l.longitude!),
             infoWindow: InfoWindow(
               title: l.title,

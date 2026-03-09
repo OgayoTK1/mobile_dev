@@ -73,7 +73,7 @@ class MyListingsScreen extends ConsumerWidget {
           return ListView.separated(
             padding: const EdgeInsets.all(16),
             itemCount: listings.length,
-            separatorBuilder: (_, __) =>
+            separatorBuilder: (context, index) =>
                 Divider(color: AppColors.border.withOpacity(0.3), height: 1),
             itemBuilder: (context, index) {
               final listing = listings[index];
@@ -267,8 +267,7 @@ class _ListingFormSheetState extends ConsumerState<_ListingFormSheet> {
           description: _descriptionController.text.trim(),
           latitude: double.parse(_latController.text.trim()),
           longitude: double.parse(_lngController.text.trim()),
-          createdBy: user.uid,
-          timestamp: DateTime.now(),
+          ownerId: user.uid,
         );
 
         await repo.createListing(listing);
@@ -284,10 +283,11 @@ class _ListingFormSheetState extends ConsumerState<_ListingFormSheet> {
         }
       }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
         );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

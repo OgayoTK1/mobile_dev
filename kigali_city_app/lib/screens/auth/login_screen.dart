@@ -1,9 +1,16 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/constants/app_constants.dart';
 import '../../core/utils/helpers.dart';
 import '../../providers/app_providers.dart';
 
+/// ──────────────────────────────────────────────────────────────
+/// Login Screen
+///
+/// Handles both Sign In and Sign Up modes.
+/// After successful signup, user must verify email before
+/// accessing the directory (enforced in the auth wrapper).
+/// ──────────────────────────────────────────────────────────────
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -16,7 +23,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _nameController = TextEditingController();
-  bool _isSignIn = true;
+
+  bool _isLogin = true;
   bool _isLoading = false;
   bool _obscurePassword = true;
 
@@ -30,42 +38,58 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+
     setState(() => _isLoading = true);
+
     try {
-      final repo = ref.read(authRepositoryProvider);
-      if (_isSignIn) {
-        await repo.signIn(
-          email: _emailController.text.trim(),
+      final authRepo = ref.read(authRepositoryProvider);
+
+      if (_isLogin) {
+        await authRepo.signIn(
+          email: _emailController.text,
           password: _passwordController.text,
         );
       } else {
-        await repo.signUp(
-          email: _emailController.text.trim(),
+        await authRepo.signUp(
+          email: _emailController.text,
           password: _passwordController.text,
-          displayName: _nameController.text.trim(),
+          displayName: _nameController.text,
         );
+
+        if (mounted) {
+          showSuccessSnackbar(
+            context,
+            'Account created! Please verify your email.',
+          );
+        }
       }
-    } on FirebaseAuthException catch (e) {
-      if (mounted) SnackbarHelper.showError(context, e.message ?? 'Auth error');
+    } catch (e) {
+      if (mounted) {
+        showErrorSnackbar(context, _parseError(e.toString()));
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _forgotPassword() async {
-    final email = _emailController.text.trim();
-    if (email.isEmpty) {
-      SnackbarHelper.showInfo(context, 'Enter your email first');
-      return;
+  String _parseError(String error) {
+    if (error.contains('user-not-found')) {
+      return 'No account found with this email';
     }
-    try {
-      await ref.read(authRepositoryProvider).sendPasswordReset(email);
-      if (mounted) {
-        SnackbarHelper.showSuccess(context, 'Password reset email sent');
-      }
-    } on FirebaseAuthException catch (e) {
-      if (mounted) SnackbarHelper.showError(context, e.message ?? 'Error');
+    if (error.contains('wrong-password')) return 'Incorrect password';
+    if (error.contains('email-already-in-use')) {
+      return 'An account already exists with this email';
     }
+    if (error.contains('weak-password')) {
+      return 'Password is too weak (min 6 characters)';
+    }
+    if (error.contains('invalid-email')) {
+      return 'Please enter a valid email address';
+    }
+    if (error.contains('network-request-failed')) {
+      return 'Network error. Check your connection.';
+    }
+    return 'Authentication failed. Please try again.';
   }
 
   @override
@@ -73,100 +97,161 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const SizedBox(height: 48),
-                Text(
-                  'Kigali City App',
-                  style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                  textAlign: TextAlign.center,
+          padding: const EdgeInsets.symmetric(horizontal: 28),
+          child: Column(
+            children: [
+              const SizedBox(height: 60),
+
+              // Logo & Title
+              const Icon(
+                Icons.location_city,
+                size: 64,
+                color: AppColors.accent,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Kigali City',
+                style: TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  'Discover Kigali',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                  textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Services & Places Directory',
+                style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 40),
+
+              // Toggle Sign In / Sign Up
+              Container(
+                decoration: BoxDecoration(
+                  color: AppColors.backgroundCard,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                const SizedBox(height: 48),
-                if (!_isSignIn) ...[
-                  TextFormField(
-                    controller: _nameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      prefixIcon: Icon(Icons.person),
-                    ),
-                    validator: (v) => Validators.required(v, 'Name'),
-                    textCapitalization: TextCapitalization.words,
-                  ),
-                  const SizedBox(height: 16),
-                ],
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(
-                    labelText: 'Email',
-                    prefixIcon: Icon(Icons.email),
-                  ),
-                  validator: Validators.email,
-                  keyboardType: TextInputType.emailAddress,
+                padding: const EdgeInsets.all(3),
+                child: Row(
+                  children: [
+                    _buildToggle('Sign In', _isLogin),
+                    _buildToggle('Sign Up', !_isLogin),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _passwordController,
-                  decoration: InputDecoration(
-                    labelText: 'Password',
-                    prefixIcon: const Icon(Icons.lock),
-                    suffixIcon: IconButton(
-                      icon: Icon(
-                        _obscurePassword
-                            ? Icons.visibility
-                            : Icons.visibility_off,
-                      ),
-                      onPressed: () =>
-                          setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                  validator: Validators.password,
-                  obscureText: _obscurePassword,
-                ),
-                if (_isSignIn) ...[
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: _forgotPassword,
-                      child: const Text('Forgot Password?'),
-                    ),
-                  ),
-                ] else
-                  const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: _isLoading ? null : _submit,
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+              ),
+              const SizedBox(height: 28),
+
+              // Form
+              Form(
+                key: _formKey,
+                child: Column(
+                  children: [
+                    // Name field (signup only)
+                    if (!_isLogin) ...[
+                      TextFormField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(
+                          hintText: 'Full Name',
+                          prefixIcon: Icon(
+                            Icons.person_outline,
+                            color: AppColors.textDim,
                           ),
-                        )
-                      : Text(_isSignIn ? 'Sign In' : 'Create Account'),
+                        ),
+                        style: const TextStyle(color: AppColors.textPrimary),
+                        validator: (v) => Validators.required(v, 'Name'),
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+
+                    // Email
+                    TextFormField(
+                      controller: _emailController,
+                      decoration: const InputDecoration(
+                        hintText: 'Email',
+                        prefixIcon: Icon(
+                          Icons.email_outlined,
+                          color: AppColors.textDim,
+                        ),
+                      ),
+                      style: const TextStyle(color: AppColors.textPrimary),
+                      keyboardType: TextInputType.emailAddress,
+                      validator: Validators.email,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Password
+                    TextFormField(
+                      controller: _passwordController,
+                      decoration: InputDecoration(
+                        hintText: 'Password',
+                        prefixIcon: const Icon(
+                          Icons.lock_outline,
+                          color: AppColors.textDim,
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                            color: AppColors.textDim,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
+                        ),
+                      ),
+                      style: const TextStyle(color: AppColors.textPrimary),
+                      obscureText: _obscurePassword,
+                      validator: Validators.password,
+                    ),
+                    const SizedBox(height: 28),
+
+                    // Submit Button
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _isLoading ? null : _submit,
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.backgroundDarker,
+                                ),
+                              )
+                            : Text(_isLogin ? 'Sign In' : 'Create Account'),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                TextButton(
-                  onPressed: () => setState(() => _isSignIn = !_isSignIn),
-                  child: Text(
-                    _isSignIn
-                        ? "Don't have an account? Sign Up"
-                        : 'Already have an account? Sign In',
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToggle(String label, bool isActive) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _isLogin = label == 'Sign In'),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.accent : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: isActive
+                  ? AppColors.backgroundDarker
+                  : AppColors.textMuted,
             ),
           ),
         ),

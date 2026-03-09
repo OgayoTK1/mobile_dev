@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_underscores
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
@@ -24,7 +26,8 @@ class DirectoryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final filteredAsync = ref.watch(filteredListingsProvider);
+    final listingsAsync = ref.watch(listingsStreamProvider);
+    final filteredListings = ref.watch(filteredListingsProvider);
     final searchQuery = ref.watch(searchQueryProvider);
     final selectedCategory = ref.watch(selectedCategoryProvider);
 
@@ -114,20 +117,23 @@ class DirectoryScreen extends ConsumerWidget {
 
           // ─── Listings ──────────────────────────────────────
           Expanded(
-            child: filteredAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+            child: listingsAsync.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (error, _) => AppErrorWidget(
                 message: 'Failed to load listings: ${error.toString()}',
                 onRetry: () => ref.invalidate(listingsStreamProvider),
               ),
-              data: (listings) {
-                if (listings.isEmpty) {
+              data: (_) {
+                if (filteredListings.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.search_off, size: 64, color: AppColors.textMuted),
+                        Icon(
+                          Icons.search_off,
+                          size: 64,
+                          color: AppColors.textMuted,
+                        ),
                         const SizedBox(height: 16),
                         const Text(
                           'No services found',
@@ -152,13 +158,14 @@ class DirectoryScreen extends ConsumerWidget {
 
                 return ListView.separated(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: listings.length,
+                  itemCount: filteredListings.length,
                   separatorBuilder: (_, __) => Divider(
+                    // ignore: deprecated_member_use
                     color: AppColors.border.withOpacity(0.3),
                     height: 1,
                   ),
                   itemBuilder: (context, index) {
-                    final listing = listings[index];
+                    final listing = filteredListings[index];
                     return ListingCard(
                       listing: listing,
                       onTap: () {

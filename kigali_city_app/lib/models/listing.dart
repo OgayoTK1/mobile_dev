@@ -14,9 +14,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 /// ──────────────────────────────────────────────────────────────
 class Listing {
   final String id;
-  final String title;
+  final String name; // was: title
   final String category;
   final String address;
+  final String description; // add
+  final String contactNumber; // add
   final String? imageUrl;
   final bool isVerified;
   final num? rating;
@@ -28,15 +30,18 @@ class Listing {
   final String? ownerId;
   final DateTime? updatedAt;
 
-  // convenience getter
   bool get hasLocation => latitude != null && longitude != null;
-  String? get listingId => id.isEmpty ? null : id;
+  String get listingId => id;
+  // alias so common_widgets.dart (which uses title) still works
+  String get title => name;
 
   const Listing({
     required this.id,
-    required this.title,
+    required this.name,
     required this.category,
     required this.address,
+    this.description = '',
+    this.contactNumber = '',
     this.imageUrl,
     this.isVerified = false,
     this.rating,
@@ -52,9 +57,11 @@ class Listing {
   factory Listing.fromJson(Map<String, dynamic> json, {String id = ''}) {
     return Listing(
       id: id,
-      title: json['title'] as String? ?? '',
+      name: json['name'] as String? ?? json['title'] as String? ?? '',
       category: json['category'] as String? ?? '',
       address: json['address'] as String? ?? '',
+      description: json['description'] as String? ?? '',
+      contactNumber: json['contactNumber'] as String? ?? '',
       imageUrl: json['imageUrl'] as String?,
       isVerified: json['isVerified'] as bool? ?? false,
       rating: json['rating'] as num?,
@@ -74,9 +81,11 @@ class Listing {
   }
 
   Map<String, dynamic> toJson() => {
-    'title': title,
+    'name': name,
     'category': category,
     'address': address,
+    'description': description,
+    'contactNumber': contactNumber,
     'imageUrl': imageUrl,
     'isVerified': isVerified,
     'rating': rating,
@@ -89,11 +98,16 @@ class Listing {
     'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
   };
 
+  // alias used by firestore_service
+  Map<String, dynamic> toFirestore() => toJson();
+
   Listing copyWith({
     String? id,
-    String? title,
+    String? name,
     String? category,
     String? address,
+    String? description,
+    String? contactNumber,
     String? imageUrl,
     bool? isVerified,
     num? rating,
@@ -107,9 +121,11 @@ class Listing {
   }) {
     return Listing(
       id: id ?? this.id,
-      title: title ?? this.title,
+      name: name ?? this.name,
       category: category ?? this.category,
       address: address ?? this.address,
+      description: description ?? this.description,
+      contactNumber: contactNumber ?? this.contactNumber,
       imageUrl: imageUrl ?? this.imageUrl,
       isVerified: isVerified ?? this.isVerified,
       rating: rating ?? this.rating,

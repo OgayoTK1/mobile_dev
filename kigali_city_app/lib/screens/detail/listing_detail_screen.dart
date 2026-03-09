@@ -3,6 +3,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/listing.dart';
+import '../../widgets/common_widgets.dart'; // add — provides StarRating
 
 /// ──────────────────────────────────────────────────────────────
 /// Listing Detail Screen
@@ -33,15 +34,17 @@ class ListingDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final LatLng position = LatLng(listing.latitude, listing.longitude);
+    // Guard nullable lat/lng
+    final double lat = listing.latitude ?? 0.0;
+    final double lng = listing.longitude ?? 0.0;
+    final LatLng position = LatLng(lat, lng);
 
     return Scaffold(
-      appBar: AppBar(title: Text(listing.name)),
+      appBar: AppBar(title: Text(listing.name)), // name not title
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ─── Hero Card ────────────────────────────────────
             Container(
               width: double.infinity,
               margin: const EdgeInsets.all(16),
@@ -97,7 +100,6 @@ class ListingDetailScreen extends StatelessWidget {
               ),
             ),
 
-            // ─── Info Cards ───────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -109,14 +111,14 @@ class ListingDetailScreen extends StatelessWidget {
                   _buildInfoTile(
                     Icons.gps_fixed,
                     'Coordinates',
-                    '${listing.latitude.toStringAsFixed(4)}, ${listing.longitude.toStringAsFixed(4)}',
+                    // safe null-aware calls
+                    '${lat.toStringAsFixed(4)}, ${lng.toStringAsFixed(4)}',
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // ─── Map Section ──────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
@@ -150,13 +152,12 @@ class ListingDetailScreen extends StatelessWidget {
                             ),
                           ),
                         },
-                        // Disable gestures for embedded map
                         zoomControlsEnabled: false,
                         scrollGesturesEnabled: false,
                         rotateGesturesEnabled: false,
                         tiltGesturesEnabled: false,
                         myLocationButtonEnabled: false,
-                        liteModeEnabled: true, // Static tile on Android
+                        liteModeEnabled: true,
                       ),
                     ),
                   ),
@@ -165,19 +166,16 @@ class ListingDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // ─── Navigate Button ──────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    launchGoogleMapsNavigation(
-                      latitude: listing.latitude,
-                      longitude: listing.longitude,
-                      label: listing.name,
-                    );
-                  },
+                  onPressed: () => launchGoogleMapsNavigation(
+                    latitude: lat,
+                    longitude: lng,
+                    label: listing.name,
+                  ),
                   icon: const Icon(Icons.navigation),
                   label: const Text('Open in Google Maps'),
                 ),

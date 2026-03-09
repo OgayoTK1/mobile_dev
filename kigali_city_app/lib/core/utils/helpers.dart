@@ -1,11 +1,36 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../constants/app_constants.dart';
 
+/// ──────────────────────────────────────────────────────────────
+/// Launches Google Maps with directions to the given coordinates
+/// ──────────────────────────────────────────────────────────────
+Future<void> launchGoogleMapsNavigation({
+  required double latitude,
+  required double longitude,
+  String? label,
+}) async {
+  final Uri googleMapsUri = Uri.parse(
+    'https://www.google.com/maps/dir/?api=1&destination=$latitude,$longitude',
+  );
+
+  if (await canLaunchUrl(googleMapsUri)) {
+    await launchUrl(googleMapsUri, mode: LaunchMode.externalApplication);
+  } else {
+    throw Exception('Could not launch Google Maps');
+  }
+}
+
+/// ──────────────────────────────────────────────────────────────
+/// Form Validators
+/// ──────────────────────────────────────────────────────────────
 class Validators {
+  Validators._();
+
   static String? email(String? value) {
-    if (value == null || value.isEmpty) return 'Email is required';
-    final emailRegex = RegExp(r'^[\w\-.]+@([\w-]+\.)+[\w-]{2,4}$');
-    if (!emailRegex.hasMatch(value)) return 'Enter a valid email';
+    if (value == null || value.trim().isEmpty) return 'Email is required';
+    final regex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
+    if (!regex.hasMatch(value.trim())) return 'Enter a valid email';
     return null;
   }
 
@@ -20,76 +45,48 @@ class Validators {
     return null;
   }
 
-  static String? phone(String? value) {
-    if (value == null || value.isEmpty) return null; // optional
-    final phoneRegex = RegExp(r'^\+?[\d\s\-]{7,15}$');
-    if (!phoneRegex.hasMatch(value)) return 'Enter a valid phone number';
+  static String? latitude(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Latitude is required';
+    final lat = double.tryParse(value);
+    if (lat == null || lat < -90 || lat > 90) {
+      return 'Enter valid latitude (-90 to 90)';
+    }
+    return null;
+  }
+
+  static String? longitude(String? value) {
+    if (value == null || value.trim().isEmpty) return 'Longitude is required';
+    final lng = double.tryParse(value);
+    if (lng == null || lng < -180 || lng > 180) {
+      return 'Enter valid longitude (-180 to 180)';
+    }
     return null;
   }
 }
 
-class SnackbarHelper {
-  static void showSuccess(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.green,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  static void showError(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Colors.red,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
-
-  static void showInfo(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
+/// ──────────────────────────────────────────────────────────────
+/// Snackbar Helpers
+/// ──────────────────────────────────────────────────────────────
+void showSuccessSnackbar(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: AppColors.success,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 2),
+    ),
+  );
 }
 
-class MapLauncher {
-  static Future<void> openInMaps({
-    required double latitude,
-    required double longitude,
-    String? label,
-  }) async {
-    final encoded = label != null ? Uri.encodeComponent(label) : '';
-    final googleMapsUrl = Uri.parse(
-      'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude&query_place_id=$encoded',
-    );
-    final appleMapsUrl = Uri.parse(
-      'https://maps.apple.com/?ll=$latitude,$longitude&q=${label ?? ''}',
-    );
-    if (await canLaunchUrl(googleMapsUrl)) {
-      await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication);
-    } else if (await canLaunchUrl(appleMapsUrl)) {
-      await launchUrl(appleMapsUrl, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  static Future<void> openUrl(String url) async {
-    final uri = Uri.parse(url.startsWith('http') ? url : 'https://$url');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  static Future<void> callPhone(String phone) async {
-    final uri = Uri.parse('tel:$phone');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
-  }
+void showErrorSnackbar(BuildContext context, String message) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      content: Text(message),
+      backgroundColor: AppColors.error,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      duration: const Duration(seconds: 3),
+    ),
+  );
 }
