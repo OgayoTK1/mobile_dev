@@ -1,80 +1,128 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../core/constants/app_constants.dart';
 import '../models/listing.dart';
 import '../models/user_profile.dart';
-import '../core/constants/app_constants.dart';
 
+/// ──────────────────────────────────────────────────────────────
+/// FirestoreService
+///
+/// Handles ALL Firestore read/write operations.
+/// This is the data layer — it knows about Firestore but nothing
+/// about UI state or widgets.
+///
+/// Why Streams instead of Futures for reads?
+///   - Firestore snapshots() returns a real-time stream
+///   - When any client adds/updates/deletes a listing, ALL
+///     listeners receive the update automatically
+///   - No manual refresh needed
+///   - StreamProvider in Riverpod maps this directly to UI state
+///
+/// Data flow: Firestore → FirestoreService (stream) →
+///            Repository → StreamProvider → UI widget rebuilds
+/// ──────────────────────────────────────────────────────────────
 class FirestoreService {
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final FirebaseFirestore _db;
 
-  // --- User Profile ---
+  FirestoreService({FirebaseFirestore? firestore})
+    : _db = firestore ?? FirebaseFirestore.instance;
 
+  // ─── References ────────────────────────────────────────────
+
+  CollectionReference get _usersRef =>
+      _db.collection(FirestoreConstants.usersCollection);
+
+  CollectionReference get _listingsRef =>
+      _db.collection(FirestoreConstants.listingsCollection);
+
+  // ─── User Profile Operations ───────────────────────────────
+
+  /// Creates a user profile document in Firestore after signup.
+  /// Document ID = Firebase Auth UID for easy lookups.
   Future<void> createUserProfile(UserProfile profile) async {
-    await _db
-        .collection(kUsersCollection)
-        .doc(profile.uid)
-        .set(profile.toFirestore());
+    await _usersRef.doc(profile.uid).set(profile.toFirestore());
   }
 
+  /// Fetches a single user profile by UID.
+  /// Returns null if the document doesn't exist.
   Future<UserProfile?> getUserProfile(String uid) async {
-    final doc = await _db.collection(kUsersCollection).doc(uid).get();
+    final doc = await _usersRef.doc(uid).get();
     if (!doc.exists) return null;
     return UserProfile.fromFirestore(doc);
   }
 
-  Future<void> updateUserProfile(
-    String uid,
+  /// Real-time stream of a user's profile.
+  /// Useful for the Settings screen to show live profile data.
+  Stream<UserProfile?> userProfileStream(String uid) {
+    return _usersRef.doc(uid).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return UserProfile.fromFirestore(doc);
+    });
+  }
+
+  // ─── Listing CRUD Operations ───────────────────────────────
+
+  /// CREATE: Adds a new listing to Firestore.
+  /// Returns the generated document ID.
+  /// The timestamp is set server-side via FieldValue.serverTimestamp().
+  Future<String> createListing(Listing listing) async {
+    final docRef = await _listingsRef.add(listing.toFirestore());
+    return docRef.id;
+  }
+
+  /// READ: Returns a real-time stream of ALL listings.
+  /// Ordered by timestamp descending (newest first).
+  ///
+  /// This stream is the backbone of the Directory screen.
+  /// Every time a listing is added, updated, or deleted anywhere,
+  /// this stream emits a new list and the UI rebuilds.
+  Stream<List<Listing>> listingsStream() {
+    return _listingsRef
+        .orderBy(FirestoreConstants.fieldTimestamp, descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => Listing.fromFirestore(doc))
+              .toList();
+        });
+  }
+
+  /// READ: Stream of listings created by a specific user.
+  /// Used for the "My Listings" screen.
+  /// Filters at Firestore query level (server-side) for efficiency.
+  Stream<List<Listing>> myListingsStream(String uid) {
+    return _listingsRef
+        .where(FirestoreConstants.fieldCreatedBy, isEqualTo: uid)
+        .orderBy(FirestoreConstants.fieldTimestamp, descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => Listing.fromFirestore(doc))
+              .toList();
+        });
+  }
+
+  /// UPDATE: Updates an existing listing.
+  /// Only fields present in the map are updated (merge behavior).
+  /// Ownership check (createdBy == currentUser.uid) is enforced
+  /// both in the app logic AND in Firestore security rules.
+  Future<void> updateListing(
+    String listingId,
     Map<String, dynamic> data,
   ) async {
-    await _db.collection(kUsersCollection).doc(uid).update(data);
+    data[FirestoreConstants.fieldTimestamp] = FieldValue.serverTimestamp();
+    await _listingsRef.doc(listingId).update(data);
   }
 
-  // --- Listings ---
-
-  Stream<List<Listing>> getAllListings() {
-    return _db
-        .collection(kListingsCollection)
-        .orderBy(FirestoreFields.updatedAt, descending: true)
-        .snapshots()
-        .map((snap) => snap.docs.map(Listing.fromFirestore).toList());
+  /// DELETE: Removes a listing from Firestore.
+  /// Ownership is enforced via Firestore security rules.
+  Future<void> deleteListing(String listingId) async {
+    await _listingsRef.doc(listingId).delete();
   }
 
-  Stream<List<Listing>> getListingsByCategory(String category) {
-    return _db
-        .collection(kListingsCollection)
-        .where(FirestoreFields.category, isEqualTo: category)
-        .orderBy(FirestoreFields.updatedAt, descending: true)
-        .snapshots()
-        .map((snap) => snap.docs.map(Listing.fromFirestore).toList());
-  }
-
-  Stream<List<Listing>> getUserListings(String uid) {
-    return _db
-        .collection(kListingsCollection)
-        .where(FirestoreFields.ownerId, isEqualTo: uid)
-        .orderBy(FirestoreFields.updatedAt, descending: true)
-        .snapshots()
-        .map((snap) => snap.docs.map(Listing.fromFirestore).toList());
-  }
-
-  Future<Listing?> getListingById(String id) async {
-    final doc = await _db.collection(kListingsCollection).doc(id).get();
+  /// Fetches a single listing by ID (one-time read).
+  Future<Listing?> getListing(String listingId) async {
+    final doc = await _listingsRef.doc(listingId).get();
     if (!doc.exists) return null;
     return Listing.fromFirestore(doc);
-  }
-
-  Future<String> createListing(Listing listing) async {
-    final ref = await _db
-        .collection(kListingsCollection)
-        .add(listing.toFirestore());
-    return ref.id;
-  }
-
-  Future<void> updateListing(String id, Map<String, dynamic> data) async {
-    data[FirestoreFields.updatedAt] = FieldValue.serverTimestamp();
-    await _db.collection(kListingsCollection).doc(id).update(data);
-  }
-
-  Future<void> deleteListing(String id) async {
-    await _db.collection(kListingsCollection).doc(id).delete();
   }
 }

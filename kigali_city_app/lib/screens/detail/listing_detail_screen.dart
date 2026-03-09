@@ -1,9 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/helpers.dart';
 import '../../models/listing.dart';
-import '../../widgets/common_widgets.dart';
 
+/// ──────────────────────────────────────────────────────────────
+/// Listing Detail Screen
+///
+/// Shows full details of a listing including:
+///   - Name, category, description
+///   - Address and contact info
+///   - Google Map with marker at listing coordinates
+///   - Navigation button to open Google Maps directions
+///
+/// How coordinates flow from Firestore → Map:
+///   1. Listing model stores latitude/longitude as double
+///   2. Listing.fromFirestore() parses them from Firestore doc
+///   3. This screen receives the Listing object
+///   4. GoogleMap widget uses LatLng(listing.latitude, listing.longitude)
+///   5. A Marker is placed at those exact coordinates
+///
+/// Why coordinates must be stored as double:
+///   - LatLng constructor requires double values
+///   - Firestore number type maps naturally to Dart double
+///   - String coordinates would need parsing (error-prone)
+///   - Mathematical operations (distance calc) need doubles
+/// ──────────────────────────────────────────────────────────────
 class ListingDetailScreen extends StatelessWidget {
   final Listing listing;
 
@@ -11,146 +33,200 @@ class ListingDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final LatLng position = LatLng(listing.latitude, listing.longitude);
+
     return Scaffold(
-      appBar: AppBar(title: Text(listing.title)),
+      appBar: AppBar(title: Text(listing.name)),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (listing.imageUrl != null)
-              Image.network(
-                listing.imageUrl!,
-                width: double.infinity,
-                height: 220,
-                fit: BoxFit.cover,
-                errorBuilder: (_, _, _) =>
-                    const SizedBox(height: 220, child: Placeholder()),
-              )
-            else
-              Container(
-                height: 160,
-                width: double.infinity,
-                color: AppColors.surface,
-                alignment: Alignment.center,
-                child: const Icon(
-                  Icons.business,
-                  size: 80,
-                  color: AppColors.textSecondary,
+            // ─── Hero Card ────────────────────────────────────
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.backgroundCard, AppColors.categoryBg],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
               ),
-            Padding(
-              padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      CategoryBadge(category: listing.category),
-                      if (listing.isVerified) ...[
-                        const SizedBox(width: 8),
-                        const Icon(
-                          Icons.verified,
-                          color: AppColors.primary,
-                          size: 18,
-                        ),
-                      ],
-                    ],
+                  Icon(
+                    AppCategories.icons[listing.category] ?? Icons.place,
+                    size: 48,
+                    color: AppColors.accent,
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    listing.title,
-                    style: Theme.of(context).textTheme.headlineSmall,
+                    listing.name,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      StarRating(rating: listing.rating),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${listing.rating.toStringAsFixed(1)} '
-                        '(${listing.reviewCount} reviews)',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
+                  const SizedBox(height: 6),
+                  Text(
+                    listing.category,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: AppColors.accent,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   Text(
                     listing.description,
-                    style: Theme.of(context).textTheme.bodyMedium,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textMuted,
+                      height: 1.5,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  const Divider(height: 32),
-                  _InfoRow(icon: Icons.location_on, text: listing.address),
-                  if (listing.phone != null) ...[
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: () => MapLauncher.callPhone(listing.phone!),
-                      child: _InfoRow(
-                        icon: Icons.phone,
-                        text: listing.phone!,
-                        isLink: true,
-                      ),
-                    ),
-                  ],
-                  if (listing.website != null) ...[
-                    const SizedBox(height: 12),
-                    GestureDetector(
-                      onTap: () => MapLauncher.openUrl(listing.website!),
-                      child: _InfoRow(
-                        icon: Icons.language,
-                        text: listing.website!,
-                        isLink: true,
-                      ),
-                    ),
-                  ],
-                  if (listing.hasLocation) ...[
-                    const SizedBox(height: 24),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: () => MapLauncher.openInMaps(
-                          latitude: listing.latitude!,
-                          longitude: listing.longitude!,
-                          label: listing.title,
-                        ),
-                        icon: const Icon(Icons.directions),
-                        label: const Text('Get Directions'),
-                      ),
-                    ),
-                  ],
+                  const SizedBox(height: 12),
+                  StarRating(rating: listing.rating ?? 0),
                 ],
               ),
             ),
+
+            // ─── Info Cards ───────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                children: [
+                  _buildInfoTile(Icons.location_on, 'Address', listing.address),
+                  const SizedBox(height: 10),
+                  _buildInfoTile(Icons.phone, 'Contact', listing.contactNumber),
+                  const SizedBox(height: 10),
+                  _buildInfoTile(
+                    Icons.gps_fixed,
+                    'Coordinates',
+                    '${listing.latitude.toStringAsFixed(4)}, ${listing.longitude.toStringAsFixed(4)}',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ─── Map Section ──────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Location',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: SizedBox(
+                      height: 200,
+                      child: GoogleMap(
+                        initialCameraPosition: CameraPosition(
+                          target: position,
+                          zoom: 15,
+                        ),
+                        markers: {
+                          Marker(
+                            markerId: MarkerId(listing.id),
+                            position: position,
+                            infoWindow: InfoWindow(
+                              title: listing.name,
+                              snippet: listing.address,
+                            ),
+                          ),
+                        },
+                        // Disable gestures for embedded map
+                        zoomControlsEnabled: false,
+                        scrollGesturesEnabled: false,
+                        rotateGesturesEnabled: false,
+                        tiltGesturesEnabled: false,
+                        myLocationButtonEnabled: false,
+                        liteModeEnabled: true, // Static tile on Android
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // ─── Navigate Button ──────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    launchGoogleMapsNavigation(
+                      latitude: listing.latitude,
+                      longitude: listing.longitude,
+                      label: listing.name,
+                    );
+                  },
+                  icon: const Icon(Icons.navigation),
+                  label: const Text('Open in Google Maps'),
+                ),
+              ),
+            ),
+            const SizedBox(height: 32),
           ],
         ),
       ),
     );
   }
-}
 
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String text;
-  final bool isLink;
-
-  const _InfoRow({required this.icon, required this.text, this.isLink = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20, color: AppColors.textSecondary),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Text(
-            text,
-            style: TextStyle(
-              color: isLink ? AppColors.primary : AppColors.textPrimary,
-              decoration: isLink ? TextDecoration.underline : null,
+  Widget _buildInfoTile(IconData icon, String label, String value) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 20, color: AppColors.accent),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textDim,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

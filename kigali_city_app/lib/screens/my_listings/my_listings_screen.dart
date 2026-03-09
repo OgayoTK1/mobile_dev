@@ -142,11 +142,21 @@ class MyListingsScreen extends ConsumerWidget {
                     .read(listingRepositoryProvider)
                     .deleteListing(listing.id);
                 if (context.mounted) {
-                  showSuccessSnackbar(context, 'Listing deleted');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Listing deleted'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
                 }
               } catch (e) {
                 if (context.mounted) {
-                  showErrorSnackbar(context, 'Failed to delete: $e');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
                 }
               }
             },
@@ -239,7 +249,12 @@ class _ListingFormSheetState extends ConsumerState<_ListingFormSheet> {
 
         if (mounted) {
           Navigator.pop(context);
-          showSuccessSnackbar(context, 'Listing updated!');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Listing updated!'),
+              backgroundColor: Colors.green,
+            ),
+          );
         }
       } else {
         // CREATE new listing
@@ -260,11 +275,19 @@ class _ListingFormSheetState extends ConsumerState<_ListingFormSheet> {
 
         if (mounted) {
           Navigator.pop(context);
-          showSuccessSnackbar(context, 'Listing created!');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Listing created!'),
+              backgroundColor: Colors.green,
+            ),
+          );
         }
       }
     } catch (e) {
-      if (mounted) showErrorSnackbar(context, 'Error: $e');
+      if (mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }

@@ -1,59 +1,69 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../core/constants/app_constants.dart';
+import '../core/constants/app_constants.dart'; // add this import
 
+/// ──────────────────────────────────────────────────────────────
+/// UserProfile model
+///
+/// Maps to: Firestore → users/{uid}
+/// Fields: email, displayName, createdAt
+///
+/// Uses factory constructors for Firestore serialization.
+/// Stored after successful signup to maintain user metadata
+/// separate from Firebase Auth.
+/// ──────────────────────────────────────────────────────────────
 class UserProfile {
   final String uid;
   final String email;
   final String displayName;
-  final String? photoUrl;
   final DateTime createdAt;
-  final bool notificationsEnabled;
 
   const UserProfile({
     required this.uid,
     required this.email,
     required this.displayName,
-    this.photoUrl,
     required this.createdAt,
-    this.notificationsEnabled = true,
   });
 
+  /// Creates UserProfile from a Firestore document snapshot.
+  /// The [doc.id] is used as the uid since documents are stored
+  /// under users/{uid}.
   factory UserProfile.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     return UserProfile(
-      uid: data[FirestoreFields.uid] as String,
-      email: data[FirestoreFields.email] as String,
-      displayName: data[FirestoreFields.displayName] as String? ?? '',
-      photoUrl: data[FirestoreFields.photoUrl] as String?,
-      createdAt: (data[FirestoreFields.createdAt] as Timestamp).toDate(),
-      notificationsEnabled:
-          data[FirestoreFields.notificationsEnabled] as bool? ?? true,
+      uid: doc.id,
+      email: data['email'] ?? '',
+      displayName: data['displayName'] ?? '',
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
+  /// Converts the UserProfile to a Map for Firestore storage.
+  /// Uses FieldValue.serverTimestamp() for createdAt to ensure
+  /// consistent timestamps across clients.
   Map<String, dynamic> toFirestore() {
     return {
-      FirestoreFields.uid: uid,
-      FirestoreFields.email: email,
-      FirestoreFields.displayName: displayName,
-      FirestoreFields.photoUrl: photoUrl,
-      FirestoreFields.createdAt: Timestamp.fromDate(createdAt),
-      FirestoreFields.notificationsEnabled: notificationsEnabled,
+      'email': email,
+      'displayName': displayName,
+      'createdAt': FieldValue.serverTimestamp(),
     };
   }
 
+  /// Creates a copy with optional overrides.
   UserProfile copyWith({
+    String? uid,
+    String? email,
     String? displayName,
-    String? photoUrl,
-    bool? notificationsEnabled,
+    DateTime? createdAt,
   }) {
     return UserProfile(
-      uid: uid,
-      email: email,
+      uid: uid ?? this.uid,
+      email: email ?? this.email,
       displayName: displayName ?? this.displayName,
-      photoUrl: photoUrl ?? this.photoUrl,
-      createdAt: createdAt,
-      notificationsEnabled: notificationsEnabled ?? this.notificationsEnabled,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
+
+  @override
+  String toString() =>
+      'UserProfile(uid: $uid, email: $email, displayName: $displayName)';
 }
