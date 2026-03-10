@@ -65,27 +65,27 @@ class FirestoreService {
   /// Returns the generated document ID.
   Future<String> createListing(Listing listing) async {
     final data = listing.toFirestore();
-    data[FirestoreConstants.fieldUpdatedAt] = FieldValue.serverTimestamp();
+    data[FirestoreConstants.fieldTimestamp] = FieldValue.serverTimestamp();
     final docRef = await _listingsRef.add(data);
     return docRef.id;
   }
 
   /// READ: Returns a real-time stream of ALL listings.
-  /// Ordered by updatedAt descending (newest first).
+  /// Ordered by timestamp descending (newest first).
   Stream<List<Listing>> listingsStream() {
     return _listingsRef
-        .orderBy(FirestoreConstants.fieldUpdatedAt, descending: true)
+        .orderBy(FirestoreConstants.fieldTimestamp, descending: true)
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => Listing.fromFirestore(doc)).toList());
   }
 
   /// READ: Stream of listings created by a specific user.
-  /// Filters by ownerId at Firestore query level (server-side).
+  /// Filters by createdBy at Firestore query level (server-side).
   Stream<List<Listing>> myListingsStream(String uid) {
     return _listingsRef
-        .where(FirestoreConstants.fieldOwnerId, isEqualTo: uid)
-        .orderBy(FirestoreConstants.fieldUpdatedAt, descending: true)
+        .where(FirestoreConstants.fieldCreatedBy, isEqualTo: uid)
+        .orderBy(FirestoreConstants.fieldTimestamp, descending: true)
         .snapshots()
         .map((snapshot) =>
             snapshot.docs.map((doc) => Listing.fromFirestore(doc)).toList());
@@ -93,7 +93,7 @@ class FirestoreService {
 
   /// UPDATE: Updates an existing listing.
   Future<void> updateListing(String listingId, Map<String, dynamic> data) async {
-    data[FirestoreConstants.fieldUpdatedAt] = FieldValue.serverTimestamp();
+    data[FirestoreConstants.fieldTimestamp] = FieldValue.serverTimestamp();
     await _listingsRef.doc(listingId).update(data);
   }
 

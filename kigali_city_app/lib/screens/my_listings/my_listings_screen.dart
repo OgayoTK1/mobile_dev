@@ -267,7 +267,7 @@ class _ListingFormSheetState extends ConsumerState<_ListingFormSheet> {
           description: _descriptionController.text.trim(),
           latitude: double.parse(_latController.text.trim()),
           longitude: double.parse(_lngController.text.trim()),
-          ownerId: user.uid,
+          createdBy: user.uid,
         );
 
         await repo.createListing(listing);

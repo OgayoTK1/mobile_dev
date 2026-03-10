@@ -34,7 +34,7 @@ class AuthWrapper extends ConsumerWidget {
   // ─── DEV BYPASS ──────────────────────────────────────────────
   // Set to true to skip authentication and go straight to the app.
   // Set back to false before production release.
-  static const bool _devBypass = true;
+  static const bool _devBypass = false;
   // ─────────────────────────────────────────────────────────────
 
   @override

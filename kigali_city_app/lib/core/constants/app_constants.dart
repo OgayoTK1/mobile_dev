@@ -51,8 +51,8 @@ class FirestoreConstants {
   static const String fieldDescription = 'description';
   static const String fieldLatitude = 'latitude';
   static const String fieldLongitude = 'longitude';
-  static const String fieldOwnerId = 'ownerId';
-  static const String fieldUpdatedAt = 'updatedAt';
+  static const String fieldCreatedBy = 'createdBy';
+  static const String fieldTimestamp = 'timestamp';
 }
 
 /// ──────────────────────────────────────────────────────────────

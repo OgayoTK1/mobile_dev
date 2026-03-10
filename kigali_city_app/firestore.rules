@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Listings ──────────────────────────────────────────────
+    // Public city directory: anyone can read listings.
+    // Only authenticated users can create/update/delete,
+    // and only the owner can modify their own listing.
+    match /listings/{listingId} {
+      allow read: if true;
+
+      allow create: if request.auth != null
+                    && request.resource.data.ownerId == request.auth.uid;
+
+      allow update, delete: if request.auth != null
+                             && resource.data.ownerId == request.auth.uid;
+    }
+
+    // ── User Profiles ─────────────────────────────────────────
+    // Only the authenticated user can read/write their own profile.
+    match /users/{uid} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == uid;
+    }
+  }
+}
