@@ -7,20 +7,30 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:563401946590:android:c0b171d77c1243f960994f",
+        "mobilesdk_app_id": "1:563401946590:android:6d54cf25cdd53b8e60994f",
         "android_client_info": {
-          "package_name": "com.ogayo.kigali_city_app"
+          "package_name": "com.ogayo.Kigali_City_Directory"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "563401946590-o7gdhtrvdsf6bgnbpjthcnvrueh2fijv.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
-          "current_key": "AIzaSyDzyjCYD3wZ4Yj9yMgvU_60uRE0Im6bBJI"
+          "current_key": "AIzaSyAbpAfFmdHWQ1KdgoDRhaoZedDdiHPNQAA"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "563401946590-o7gdhtrvdsf6bgnbpjthcnvrueh2fijv.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

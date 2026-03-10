@@ -28,14 +28,12 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.ogayo.kigali_city_app"
+        applicationId = "com.ogayo.Kigali_City_Directory"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
-
-        manifestPlaceholders["MAPS_API_KEY"] = localProperties.getProperty("MAPS_API_KEY") ?: ""
     }
 
     buildTypes {
@@ -49,4 +47,8 @@ flutter {
     source = "../.."
 }
 
-dependencies {}
+dependencies {
+    // Firebase BoM — manages all Firebase SDK versions consistently
+    implementation(platform("com.google.firebase:firebase-bom:34.10.0"))
+    implementation("com.google.firebase:firebase-analytics")
+}
