@@ -48,7 +48,7 @@ class AuthRepository {
     required String password,
     required String displayName,
   }) async {
-    final credential = await _authService.signUpWithEmail(
+    final credential = await _authService.createUserWithEmail(
       email: email.trim(),
       password: password,
     );
@@ -111,7 +111,7 @@ class AuthRepository {
 
   // ─── Password Reset ──────────────────────────────────────────
   Future<void> sendPasswordReset({required String email}) async {
-    await _authService.sendPasswordReset(email: email.trim());
+    await _authService.sendPasswordResetEmail(email.trim());
   }
 
   // ─── User Profile ────────────────────────────────────────────

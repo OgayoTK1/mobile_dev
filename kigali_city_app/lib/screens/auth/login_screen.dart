@@ -59,10 +59,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_signInKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
-      await ref.read(authRepositoryProvider).signIn(
-            email: _siEmailCtrl.text,
-            password: _siPasswordCtrl.text,
-          );
+      await ref
+          .read(authRepositoryProvider)
+          .signIn(email: _siEmailCtrl.text, password: _siPasswordCtrl.text);
     } on Exception catch (e) {
       if (mounted) showErrorSnackbar(context, _parseError(e.toString()));
     } finally {
@@ -75,7 +74,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_signUpKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
-      await ref.read(authRepositoryProvider).signUp(
+      await ref
+          .read(authRepositoryProvider)
+          .signUp(
             email: _suEmailCtrl.text,
             password: _suPasswordCtrl.text,
             displayName: _suNameCtrl.text,
@@ -183,6 +184,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (error.contains('too-many-requests')) {
       return 'Too many attempts. Please try again later.';
     }
+    if (error.contains('blocked') || error.contains('BLOCKED')) {
+      return 'Sign-up is currently disabled. Please contact the administrator.';
+    }
+    if (error.contains('internal-error') || error.contains('INTERNAL')) {
+      return 'A server error occurred. Please try again later.';
+    }
     return 'Something went wrong. Please try again.';
   }
 
@@ -286,8 +293,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               suffixIcon: _visibilityIcon(
                 obscure: _obscureSignIn,
-                onTap: () =>
-                    setState(() => _obscureSignIn = !_obscureSignIn),
+                onTap: () => setState(() => _obscureSignIn = !_obscureSignIn),
               ),
             ),
             style: const TextStyle(color: AppColors.textPrimary),
@@ -371,8 +377,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               suffixIcon: _visibilityIcon(
                 obscure: _obscureSignUp,
-                onTap: () =>
-                    setState(() => _obscureSignUp = !_obscureSignUp),
+                onTap: () => setState(() => _obscureSignUp = !_obscureSignUp),
               ),
             ),
             style: const TextStyle(color: AppColors.textPrimary),
@@ -392,8 +397,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               suffixIcon: _visibilityIcon(
                 obscure: _obscureConfirm,
-                onTap: () =>
-                    setState(() => _obscureConfirm = !_obscureConfirm),
+                onTap: () => setState(() => _obscureConfirm = !_obscureConfirm),
               ),
             ),
             style: const TextStyle(color: AppColors.textPrimary),
@@ -455,8 +459,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color:
-                  isActive ? AppColors.backgroundDarker : AppColors.textMuted,
+              color: isActive
+                  ? AppColors.backgroundDarker
+                  : AppColors.textMuted,
             ),
           ),
         ),

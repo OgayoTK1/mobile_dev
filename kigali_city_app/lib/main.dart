@@ -29,11 +29,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
 
-  runApp(
-    // ProviderScope is required for Riverpod.
-    // It stores the state of all providers.
-    const ProviderScope(child: KigaliCityApp()),
-  );
+  runApp(const ProviderScope(child: KigaliCityApp()));
 }
 
 class KigaliCityApp extends StatelessWidget {

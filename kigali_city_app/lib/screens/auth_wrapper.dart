@@ -31,8 +31,16 @@ import 'home_shell.dart';
 class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({super.key});
 
+  // ─── DEV BYPASS ──────────────────────────────────────────────
+  // Set to true to skip authentication and go straight to the app.
+  // Set back to false before production release.
+  static const bool _devBypass = true;
+  // ─────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (_devBypass) return const HomeShell();
+
     final authState = ref.watch(authStateProvider);
 
     return authState.when(

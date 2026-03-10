@@ -84,30 +84,3 @@ class AppCategories {
   };
 }
 
-/// ──────────────────────────────────────────────────────────────
-/// App-wide text styles
-/// ──────────────────────────────────────────────────────────────
-class AppTextStyles {
-  AppTextStyles._();
-
-  static const TextStyle body1 = TextStyle(
-    fontSize: 16,
-    fontWeight: FontWeight.w500,
-  );
-}
-
-// Firestore collection names
-const String kUsersCollection = 'users';
-const String kListingsCollection = 'listings';
-
-class FirestoreFields {
-  static const String uid = 'uid';
-  static const String email = 'email';
-  static const String displayName = 'displayName';
-  static const String photoUrl = 'photoUrl';
-  static const String createdAt = 'createdAt';
-  static const String notificationsEnabled = 'notificationsEnabled';
-  static const String updatedAt = 'updatedAt';
-  static const String category = 'category';
-  static const String ownerId = 'ownerId';
-}
